@@ -67,7 +67,7 @@ println("Computation took $(t2-t1)")
 
 # upload files to s3
 ec2files = glob("*.jld2",CORR)
-s3files = [replace(s,"/home/ubuntu"=>"") for s in ec2files]
+s3files = [replace(s,"/home/ubuntu/"=>"") for s in ec2files]
 Ncorr = length(ec2files)
 @eval @everywhere s3files=$s3files
 @eval @everywhere ec2files=$ec2files
