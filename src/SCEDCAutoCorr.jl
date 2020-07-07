@@ -124,6 +124,3 @@ function upload_par(aws::Dict,output_bucket::String,s3file::String,ec2file::Stri
         s3_put(aws,output_bucket,s3file,read(ec2file))
 	end
 end
-
-
-end
