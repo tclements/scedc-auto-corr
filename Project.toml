@@ -1,0 +1,13 @@
+name = "SCEDCAutoCorr"
+uuid = "d7092747-afd9-464e-8b97-faf53fe1d072"
+authors = ["Tim Clements <thclements@g.harvard.edu> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
