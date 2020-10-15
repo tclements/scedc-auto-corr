@@ -78,7 +78,7 @@ function process(
 	instpath = joinpath(XMLDIR,net * '_' * sta * ".xml" )
 	RESP = read_meta("sxml",instpath,s=s,t=t)
 	ind = findfirst(RESP.id .== S[1].id)
-	highpass!(S,0.01,zerophase=true)
+	highpass!(S,0.1,zerophase=true,corners=2)
 	S.loc[1] = RESP[ind].loc
 	S.gain[1] = RESP[ind].gain
 	translate_resp!(S,RESP[ind].resp)
