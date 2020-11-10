@@ -1,4 +1,4 @@
-name = "SCEDCAutoCorr"
+name = "SCEDCCorr"
 uuid = "d7092747-afd9-464e-8b97-faf53fe1d072"
 authors = ["Tim Clements <thclements@g.harvard.edu> and contributors"]
 version = "0.1.0"

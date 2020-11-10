@@ -1,3 +1,3 @@
-# SCEDCAutoCorr
+# SCEDCCorr
 
-Autocorrelation of the SCEDC open dataset on AWS.
+Correlation and autocorrelation of the SCEDC open dataset on AWS.

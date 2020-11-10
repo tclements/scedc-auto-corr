@@ -1,8 +1,4 @@
-module SCEDCAutoCorr
-
-
-using SeisIO,SeisNoise, AWSS3, AWSCore, Dates, Glob, Statistics
-export sc_all, prunefiles,upload_par, process
+export sc_all, prunefiles, upload_par, process, date_yyyyddd
 
 function sc_all(
 	files::AbstractArray,
@@ -28,7 +24,7 @@ function sc_all(
 	instpath = joinpath(XMLDIR,net * '_' * sta * ".xml" )
 	RESP = read_meta("sxml",instpath,s=s,t=t)
 
-	F1 = process(
+	F1 = process_sc(
 		files[1],
 		fs,
 		RESP,
@@ -40,7 +36,7 @@ function sc_all(
 	)
 
 	# read 2nd channel
-	F2 = process(
+	F2 = process_sc(
 		files[2],
 		fs,
 		RESP,
@@ -52,7 +48,7 @@ function sc_all(
 	)
 
 	# read 3rd channel
-	F3 = process(
+	F3 = process_sc(
 		files[3],
 		fs,
 		RESP,
@@ -75,7 +71,7 @@ function sc_all(
     return nothing
 end
 
-function process(
+function process_sc(
 	file::String,
 	fs::Real,
 	RESP::SeisData,
@@ -147,5 +143,4 @@ end
 function upload_par(aws::Dict,output_bucket::String,s3file::String,ec2file::String)
     println("Uploading file $ec2file")
     s3_put(aws,output_bucket,s3file,read(ec2file))
-end
 end
