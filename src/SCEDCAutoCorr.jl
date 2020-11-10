@@ -4,43 +4,86 @@ module SCEDCAutoCorr
 using SeisIO,SeisNoise, AWSS3, AWSCore, Dates, Glob, Statistics
 export sc_all, prunefiles,upload_par, process
 
-function sc_all(files::AbstractArray,fs::AbstractFloat,cc_len::Int,cc_step::Int,
-	            freqmin::AbstractFloat,freqmax::AbstractFloat,maxlag::AbstractFloat,
-				CORROUT::String,XMLDIR::String;maxgaps::Int=10)
+function sc_all(
+	files::AbstractArray,
+	fs::AbstractFloat,
+	cc_len::Real,
+	cc_step::Real,
+	freqmin::AbstractFloat,
+	freqmax::AbstractFloat,
+	maxlag::AbstractFloat,
+	CORROUT::String,
+	XMLDIR::String;
+	responsefreq::Real=0.1,
+)
 	println("Reading $(basename(dirname(files[1]))) $(replace(basename(files[1])[1:7],"_"=>""))")
-	try
-		F1 = process(files[1],fs,XMLDIR, cc_len, cc_step, freqmin, freqmax,maxgaps=maxgaps)
 
-		# read 2nd channel
-		F2 = process(files[2],fs,XMLDIR, cc_len, cc_step, freqmin, freqmax,maxgaps=maxgaps)
+	# read instrument response only once 
+	s = date_yyyyddd(files[1][end-9:end-3])
+	t = s + Day(1)
+	s = Dates.format(s, "yyyy-mm-dd HH:MM:SS")
+	t = Dates.format(t, "yyyy-mm-dd HH:MM:SS")
+	net = basename(files[1])[1:2]
+	sta = split(basename(files[1]),"_")[1][3:end]
+	instpath = joinpath(XMLDIR,net * '_' * sta * ".xml" )
+	RESP = read_meta("sxml",instpath,s=s,t=t)
 
-		# read 3rd channel
-		F3 = process(files[3],fs,XMLDIR, cc_len, cc_step, freqmin, freqmax,maxgaps=maxgaps)
+	F1 = process(
+		files[1],
+		fs,
+		RESP,
+		cc_len,
+		cc_step,
+		freqmin,
+		freqmax,
+		responsefreq=responsefreq,
+	)
 
-		C1 = correlate(F1,F2,maxlag)
-		stack!(C1)
-		save_corr(C1,CORROUT)
-		C2 = correlate(F1,F3,maxlag)
-		stack!(C2)
-		save_corr(C2,CORROUT)
-		C3 = correlate(F2,F3,maxlag)
-		stack!(C3)
-		save_corr(C3,CORROUT)
-	catch e 
-		println(e)
-	end
+	# read 2nd channel
+	F2 = process(
+		files[2],
+		fs,
+		RESP,
+		cc_len,
+		cc_step,
+		freqmin,
+		freqmax,
+		responsefreq=responsefreq,
+	)
+
+	# read 3rd channel
+	F3 = process(
+		files[3],
+		fs,
+		RESP,
+		cc_len,
+		cc_step,
+		freqmin,
+		freqmax,
+		responsefreq=responsefreq,
+	)
+
+	C1 = correlate(F1,F2,maxlag)
+	stack!(C1)
+	save_corr(C1,CORROUT)
+	C2 = correlate(F1,F3,maxlag)
+	stack!(C2)
+	save_corr(C2,CORROUT)
+	C3 = correlate(F2,F3,maxlag)
+	stack!(C3)
+	save_corr(C3,CORROUT)
     return nothing
 end
 
 function process(
 	file::String,
 	fs::Real,
-	XMLDIR::String,
+	RESP::SeisData,
 	cc_len::Real,
 	cc_step::Real,
 	freqmin::Real,
 	freqmax::Real;
-	maxgaps::Int=10,
+	responsefreq::Real=0.1,
 )
 	S = read_data("mseed",file)
 	merge!(S)
@@ -55,17 +98,12 @@ function process(
     phase_shift!(S, ϕshift=true) # t
 
 	# remove instrument response
-	start = Dates.unix2datetime(S[1].t[1,2] * 1e-6)
-	s = string(round(start,Dates.Day))
-	t = string(round(start,Dates.Day) + Day(1))
 	net,sta,loc,chan = split(S.id[1],'.')
-	instpath = joinpath(XMLDIR,net * '_' * sta * ".xml" )
-	RESP = read_meta("sxml",instpath,s=s,t=t)
 	ind = findfirst(RESP.id .== S[1].id)
-	highpass!(S,0.1,zerophase=true,corners=2)
+	highpass!(S,responsefreq,zerophase=true,corners=2)
 	S.loc[1] = RESP[ind].loc
 	S.gain[1] = RESP[ind].gain
-	translate_resp!(S,RESP[ind].resp)
+	S.resp[1] = RESP[ind].resp
 	remove_resp!(S)
 
 	# convert to RawData
@@ -101,8 +139,16 @@ function prunefiles(filelist::AbstractArray)
 	return infiles
 end
 
+function date_yyyyddd(yearday::String)
+    @assert occursin(r"[1-2][0-9][0-9][0-9][0-3][0-6][0-9]",yearday)
+    yint = parse(Int,yearday[1:4])
+    dint = parse(Int,yearday[5:end])
+    @assert dint <= 366 "Input day must be less than or equal to 366"
+    return DateTime(yint) + Day(dint-1)
+end
+
 function upload_par(aws::Dict,output_bucket::String,s3file::String,ec2file::String)
     println("Uploading file $ec2file")
-        s3_put(aws,output_bucket,s3file,read(ec2file))
-	end
+    s3_put(aws,output_bucket,s3file,read(ec2file))
+end
 end
