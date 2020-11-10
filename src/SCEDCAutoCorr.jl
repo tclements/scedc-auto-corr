@@ -17,29 +17,17 @@ function sc_all(files::AbstractArray,fs::AbstractFloat,cc_len::Int,cc_step::Int,
 		# read 3rd channel
 		F3 = process(files[3],fs,XMLDIR, cc_len, cc_step, freqmin, freqmax,maxgaps=maxgaps)
 
-		if any(isnothing.([F1,F2,F3]))
-			return nothing
-		end
-
 		C1 = correlate(F1,F2,maxlag)
-		if isnothing(C1)
-			return nothing
-		end
 		stack!(C1)
 		save_corr(C1,CORROUT)
 		C2 = correlate(F1,F3,maxlag)
-		if isnothing(C2)
-			return nothing
-		end
 		stack!(C2)
 		save_corr(C2,CORROUT)
 		C3 = correlate(F2,F3,maxlag)
-		if isnothing(C3)
-			return nothing
-		end
 		stack!(C3)
 		save_corr(C3,CORROUT)
-	catch
+	catch e 
+		println(e)
 	end
     return nothing
 end
@@ -55,10 +43,6 @@ function process(
 	maxgaps::Int=10,
 )
 	S = read_data("mseed",file)
-	if size(S[1].t,1) > maxgaps
-		return nothing
-	end
-
 	merge!(S)
     ungap!(S)
 	detrend!(S)         # remove mean & trend from channel
@@ -86,13 +70,11 @@ function process(
 
 	# convert to RawData
 	R = RawData(S,cc_len,cc_step)
-	S = nothing
 	detrend!(R)
 	taper!(R)
 	bandpass!(R,freqmin,freqmax,zerophase=true)
 	clip!(R,3)
-	F = compute_fft(R)
-	R = nothing
+	F = rfft(R)
 	whiten!(F,freqmin,freqmax)
 	return F
 end
