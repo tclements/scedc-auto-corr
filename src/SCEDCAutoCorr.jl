@@ -90,9 +90,6 @@ function process(
     ungap!(S)
 	detrend!(S)         # remove mean & trend from channel
 	taper!(S)                      # taper channel ends
-	if fs ∉ S.fs
-		filtfilt!(S,fh=fs/2,rt="Lowpass")    # lowpass filter before downsampling
-	end
 	resample!(S,fs=fs) # downsample to lower fs
 	taper!(S)
     phase_shift!(S, ϕshift=true) # t
@@ -123,8 +120,8 @@ function prunefiles(filelist::AbstractArray)
     end
 	files = deepcopy(filelist)
     fsizes = [filesize(f) for f in files]
-    ind = findall(fsizes .< median(fsizes) / 10)
-    deleteat!(files,ind)
+    ind = findall((fsizes .< median(fsizes) / 4) .| (fsizes .> median(fsizes) * 2))
+	deleteat!(files,ind)
 
     # get individual stations
     stations = unique([replace(basename(f)[1:7],"_"=>"") for f in files])
