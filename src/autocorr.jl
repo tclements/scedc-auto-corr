@@ -110,13 +110,13 @@ function process_sc(
 	return F
 end
 
-function prunefiles(filelist::AbstractArray)
+function prunefiles(filelist::AbstractArray; minsize = 0.25, maxsize = 2.)
     if length(filelist) == 0
 	    return []
     end
 	files = deepcopy(filelist)
     fsizes = [filesize(f) for f in files]
-    ind = findall((fsizes .< median(fsizes) / 4) .| (fsizes .> median(fsizes) * 2))
+    ind = findall((fsizes .< median(fsizes) * minsize) .| (fsizes .> median(fsizes) * maxsize))
 	deleteat!(files,ind)
 
     # get individual stations
