@@ -1,4 +1,4 @@
-export prunefiles, upload_par, read_resp, date_yyyyddd
+export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, XML_download
 
 function prunefiles(filelist::AbstractArray; minsize = 0.25, maxsize = 2.)
     if length(filelist) == 0
@@ -22,12 +22,16 @@ function prunefiles(filelist::AbstractArray; minsize = 0.25, maxsize = 2.)
 	return infiles
 end
 
-function date_yyyyddd(yearday::String)
+function yyyyjjj2date(yearday::String)
     @assert occursin(r"[1-2][0-9][0-9][0-9][0-3][0-6][0-9]",yearday)
     yint = parse(Int,yearday[1:4])
     dint = parse(Int,yearday[5:end])
     @assert dint <= 366 "Input day must be less than or equal to 366"
     return DateTime(yint) + Day(dint-1)
+end
+
+function date2yyyyjjj(d::TimeType)
+    return "$(year(d))/$(year(d))_$(dayofyear(d))"
 end
 
 function upload_par(aws::Dict,output_bucket::String,s3file::String,ec2file::String)
@@ -36,7 +40,7 @@ function upload_par(aws::Dict,output_bucket::String,s3file::String,ec2file::Stri
 end
 
 function read_resp(file::String,XMLDIR::String)
-    s = date_yyyyddd(file[end-9:end-3])
+    s = yyyyjjj2date(file[end-9:end-3])
 	t = s + Day(1)
 	s = Dates.format(s, "yyyy-mm-dd HH:MM:SS")
 	t = Dates.format(t, "yyyy-mm-dd HH:MM:SS")
@@ -44,4 +48,17 @@ function read_resp(file::String,XMLDIR::String)
 	sta = split(basename(file),"_")[1][3:end]
 	instpath = joinpath(XMLDIR,net * '_' * sta * ".xml" )
     return read_meta("sxml",instpath,s=s,t=t)
+end
+
+function XML_download(aws,XMLDIR)
+    if !isdir(XMLDIR)
+        mkpath(XMKDIR)
+    end
+    req = collect(s3_list_objects(aws,"scedc-pds","FDSNstationXML/CI/"))
+    xmlin = [r["Key"] for r in req]
+    xmlout = joinpath.(XMLDIR,basename.(xmlin))
+    for ii = 1:length(xmlin)
+        s3_get_file(aws,"scedc-pds",xmlin[ii],xmlout[ii])
+    end
+    return nothing
 end

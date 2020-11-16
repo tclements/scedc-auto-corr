@@ -1,15 +1,15 @@
-export prepare_LH, LH_to_FFT, read_and_remove, all2all!
+export prepare_LH, LH_to_FFT, read_and_remove, all2all!, LH_corr, LH_query, LH_download, LH_day_corr
 
 function prepare_LH(
-    fileE::String,
-    fileN::String,
-    fileZ::String,
+    files::AbstractArray,
     XMLDIR::String,
     freqmin::Real,
     freqmax::Real,
     cc_len::Real,
     cc_step::Real,
 )
+    sort!(files)
+    fileE, fileN, fileZ = files
     RESP = read_resp(fileE,XMLDIR)
 
     # read and remove instrument resp
@@ -17,10 +17,16 @@ function prepare_LH(
     N = read_and_remove(fileN,freqmin,freqmax,RESP)
     Z = read_and_remove(fileZ,freqmin,freqmax,RESP)
 
+    # synchronize E and N starttimes/endtimes for normalization 
+    S = E + N
+    sync!(S,s="last",t="first")
+    E = S[1:1]
+    N = S[2:2]
+
     # bandpass between 15 and 50 seconds 
     Efilt = filtfilt(E,rt="Bandpass",fl=1/50.,fh=1/15.,np=2)
-    Nfilt = filtfilt(E,rt="Bandpass",fl=1/50.,fh=1/15.,np=2)
-    Zfilt = filtfilt(E,rt="Bandpass",fl=1/50.,fh=1/15.,np=2)
+    Nfilt = filtfilt(N,rt="Bandpass",fl=1/50.,fh=1/15.,np=2)
+    Zfilt = filtfilt(Z,rt="Bandpass",fl=1/50.,fh=1/15.,np=2)
 
     # normalize Z comp with 128-second weight 
     weights = smooth(abs.(Zfilt.x[1]),64)
@@ -59,7 +65,7 @@ function LH_to_FFT(E,N,Z,cc_len,cc_step)
     Efft.fft ./= smooth(abs.(Efft.fft),50)
     Nfft.fft ./= smooth(abs.(Efft.fft),50)
     Zfft.fft ./= smooth(abs.(Zfft.fft),50)
-    return Efft, Nfft, Zfft 
+    return [Efft, Nfft, Zfft] 
 end
 
 function read_and_remove(file::String,freqmin::Real,freqmax::Real,RESP::SeisData)
@@ -78,14 +84,80 @@ function read_and_remove(file::String,freqmin::Real,freqmax::Real,RESP::SeisData
     return S
 end
 
-function all2all!(C::AbstractArray(CorrData),FFT1::AbstractArray{FFTData},FFT2::AbstractArray{FFTData},maxlag::Real)
+function all2all!(
+    C::AbstractArray{CorrData},
+    FFT1::AbstractArray{FFTData},
+    FFT2::AbstractArray{FFTData},
+    maxlag::Real,
+)
     @assert size(FFT1,1) == 3
     @assert size(FFT2,1) == 3 
-    @assert size(C,1) == 9 
+    @assert size(C,1) == 9
     @inbounds for ii = 1:3
-        @inbounds for jj = 1+3
+        @inbounds for jj = 1:3
             C[(ii-1) * 3 + jj] = correlate(FFT1[ii],FFT2[jj],maxlag)
         end
+    end
+    return nothing
+end
+
+function LH_corr(FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
+    N = size(FFTS,1)
+    comps = ["EE","EN","EZ","NE","NN","NZ","ZE","ZN","ZZ"]
+    CS = Array{CorrData}(undef,9)
+    for ii = 1:N-1
+        filename = joinpath(CORRDIR,"$(join(split(basename(FFTS[ii][1].name),'.')[1:2],'.')).jld2")
+        file = jldopen(filename, "a+")
+        for jj = ii+1:N
+            sta2 = join(split(basename(FFTS[jj][1].name),'.')[1:2],'.')
+
+            # cross-correlate 
+            all2all!(CS,FFTS[ii],FFTS[jj],maxlag)
+            stack!.(CS)
+
+            # save to file
+            for kk = 1:9
+                compname = "$sta2/$(CS[kk].comp)/$(CS[kk].id)"
+                file[compname] = CS[kk]
+            end
+        end
+        close(file)
+    end
+    return nothing
+end
+
+function LH_day_corr(d::Date,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,cc_step)
+    println("Correlating $d")
+    CORROUT = joinpath(CORRDIR,date2yyyyjjj(d))
+    mkpath(CORROUT)
+    filelist = LH_query(aws,d)
+    LH_download(aws,filelist,DATADIR)
+    infiles = joinpath.(DATADIR,filelist)
+    ZNEfiles = prunefiles(infiles)
+    FFTS = map(x -> prepare_LH(x,XMLDIR,freqmin,freqmax,cc_len,cc_step),ZNEfiles)
+    LH_corr(FFTS,maxlag,CORROUT)
+    rm.(infiles)
+    return nothing
+end
+
+function LH_query(aws::AWSConfig,d::TimeType)
+    # download index for day
+    path = SCEDC.indexpath(d)
+    filedf = CSV.File(IOBuffer(s3_get(aws,"scedc-pds",path))) |> DataFrame
+    filedf = filedf[occursin.("LH",filedf[:,:seedchan]),:]
+    return scedcpath.(filedf[:ms_filename])
+end
+
+function LH_download(aws,filelist,OUTDIR)
+    outfiles = [joinpath(OUTDIR,f) for f in filelist]
+    filedir = unique([dirname(f) for f in outfiles])
+	for ii = 1:length(filedir)
+		if !isdir(filedir[ii])
+			mkpath(filedir[ii])
+		end
+    end
+    for ii = 1:length(filelist)
+        s3_get_file(aws,"scedc-pds",filelist[ii],outfiles[ii])
     end
     return nothing
 end
