@@ -1,4 +1,5 @@
-export prepare_LH, LH_to_FFT, read_and_remove, all2all!, LH_corr, LH_query, LH_download, LH_day_corr
+export prepare_LH, LH_to_FFT, read_and_remove, all2all!
+export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack
 
 function prepare_LH(
     files::AbstractArray,
@@ -101,28 +102,28 @@ function all2all!(
     return nothing
 end
 
-function LH_corr(FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
+function LH_corr(d::Date,FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
     N = size(FFTS,1)
     comps = ["EE","EN","EZ","NE","NN","NZ","ZE","ZN","ZZ"]
     CS = Array{CorrData}(undef,9)
+    filename = joinpath(CORRDIR,"$(date2yyyyjjj(d)).jld2")
+    file = jldopen(filename, "a+")
     for ii = 1:N-1
-        filename = joinpath(CORRDIR,"$(join(split(basename(FFTS[ii][1].name),'.')[1:2],'.')).jld2")
-        file = jldopen(filename, "a+")
         for jj = ii+1:N
-            sta2 = join(split(basename(FFTS[jj][1].name),'.')[1:2],'.')
-
             # cross-correlate 
             all2all!(CS,FFTS[ii],FFTS[jj],maxlag)
             stack!.(CS)
+            net1,sta1,loc1,chan1,net2,sta2,loc2,chan2 = split(CS[1].name,'.')
+            netsta = join([net1,sta1,net2,sta2],".")
 
             # save to file
             for kk = 1:9
-                compname = "$sta2/$(CS[kk].comp)/$(CS[kk].id)"
+                compname = "$netsta/$(CS[kk].comp)/$(CS[kk].id)"
                 file[compname] = CS[kk]
             end
         end
-        close(file)
     end
+    close(file)
     return nothing
 end
 
@@ -162,5 +163,87 @@ function LH_download(aws,filelist,OUTDIR)
     return nothing
 end
 
+function LH_stack(combname,STACKDIR)
+    if !isdir(STACKDIR)
+        mkpath(STACKDIR)
+    end
+
+    comps = ["EE","EN","EZ","NE","NN","NZ","ZE","ZN","ZZ"]
+    # open comb and stack file 
+    combfile = jldopen(combname,"r")
+    stackname = joinpath(STACKDIR,basename(combname))
+    stackfile = jldopen(stackname,"a+")
+    ks = keys(combfile)
+    N = length(ks)
+
+    # stack over each time month
+    for ii = 1:N
+        for jj = 1:length(comps)
+            chan = ks[ii] * "/" * comps[jj]
+            days = keys(combfile[chan])
+            num_days  = length(days)
+
+            # get sizes of all corrs
+            C = CorrData()
+            for kk = 1:num_days
+                C += combfile[chan * "/" * days[kk]]
+            end
+
+            stack!(C,allstack=true)
+            push!(C.notes,"$(now()) ¦ processing ¦ stack! ¦ $num_days days")
+            stackfile[chan] = C
+        end
+    end
+    close(combfile)
+    close(stackfile)
+    return nothing 
+end
+
+function getkeys(file)
+    ks = keys(file)
+    out = String[]
+    sizehint!(out,size(ks,1) * 9)
+    for ii = 1:size(ks,1)
+        compks = ks[ii] .* "/" .* keys(file[ks[ii]])
+        for jj = 1:size(compks,1)
+            push!(out,compks[jj] * "/" * keys(file[compks[jj]])[1])
+        end
+    end
+    return out
+end
+
+function LH_write_combine(CORRDIR,COMBDIR)
+    if !isdir(COMBDIR)
+        mkpath(COMBDIR)
+    end
+
+    files = glob("*",CORRDIR)
+    yyyy = [parse(Int,basename(f)[1:4]) for f in files]
+    mm = [month(yyyyjjj2date(replace(basename(f)[1:8],"_"=>""))) for f in files]
+    yyyymm = hcat(yyyy,mm)
+    months = unique(yyyymm,dims=1)
+    Nmonths = size(months,1)
+
+    # open COMBfile 
+    for ii = 1:Nmonths
+        ind = findall(months[ii] .== yyyymm)
+        combname = joinpath(
+                            COMBDIR,
+                            string(months[ii,1]) 
+                            * "_" * string(months[ii,2]) 
+                             * ".jld2")
+        combfile = jldopen(combname,"a+")
+        for jj = 1:length(ind)
+            file = jldopen(files[ind[jj]],"r")
+            filekeys = getkeys(file)
+            for kk = 1:length(filekeys)
+                combfile[filekeys[kk]] = file[filekeys[kk]]
+            end
+            close(file)
+        end
+        close(combfile)
+    end
+    return nothing 
+end
 
 

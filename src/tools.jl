@@ -31,7 +31,7 @@ function yyyyjjj2date(yearday::String)
 end
 
 function date2yyyyjjj(d::TimeType)
-    return "$(year(d))/$(year(d))_$(dayofyear(d))"
+    return "$(year(d))_$(lpad(dayofyear(d),3,"0"))"
 end
 
 function upload_par(aws::Dict,output_bucket::String,s3file::String,ec2file::String)
