@@ -236,7 +236,7 @@ function LH_write_combine(CORRDIR,COMBDIR)
         combname = joinpath(
                             COMBDIR,
                             string(months[ii,1]) 
-                            * "_" * string(months[ii,2]) 
+                            * "_" * lpad(string(months[ii,2]),2,"0")
                              * ".jld2")
         combfile = jldopen(combname,"a+")
         for jj = 1:length(ind)
