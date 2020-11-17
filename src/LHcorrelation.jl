@@ -1,5 +1,5 @@
 export prepare_LH, LH_to_FFT, read_and_remove, all2all!
-export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack, LH_all_day
+export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack
 
 function prepare_LH(
     files::AbstractArray,
@@ -127,7 +127,7 @@ function LH_corr(d::Date,FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
     return nothing
 end
 
-function LH_day_corr(d::Date,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,cc_step)
+function LH_day_corr(d::Date,aws,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,cc_step,maxlag)
     println("Correlating $d")
     CORROUT = joinpath(CORRDIR,date2yyyyjjj(d))
     mkpath(CORROUT)
@@ -136,7 +136,7 @@ function LH_day_corr(d::Date,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,cc_step)
     infiles = joinpath.(DATADIR,filelist)
     ZNEfiles = prunefiles(infiles)
     FFTS = map(x -> prepare_LH(x,XMLDIR,freqmin,freqmax,cc_len,cc_step),ZNEfiles)
-    LH_corr(FFTS,maxlag,CORROUT)
+    LH_corr(d,FFTS,maxlag,CORROUT)
     rm.(infiles)
     return nothing
 end
@@ -244,17 +244,6 @@ function LH_write_combine(CORRDIR,COMBDIR)
         end
         close(combfile)
     end
-    return nothing 
-end
-
-function LH_all_day(d,aws,DATADIR,XMLDIR,CORRDIR,freqmin,freqmax,cc_len,cc_step,maxlag)
-    println("Correlating $d")
-    filelist = LH_query(aws,d)
-    LH_download(aws,filelist,DATADIR)
-    infiles = joinpath.(DATADIR,filelist)
-    ZNEfiles = prunefiles(infiles)
-    FFTS = map(x -> prepare_LH(x,XMLDIR,freqmin,freqmax,cc_len,cc_step),ZNEfiles)
-    LH_day_corr(d,FFTS,maxlag,CORRDIR)
     return nothing 
 end
 
