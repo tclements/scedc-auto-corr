@@ -1,5 +1,5 @@
 export prepare_LH, LH_to_FFT, read_and_remove, all2all!
-export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack
+export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack, LH_all_day
 
 function prepare_LH(
     files::AbstractArray,
@@ -246,4 +246,14 @@ function LH_write_combine(CORRDIR,COMBDIR)
     return nothing 
 end
 
+function LH_all_day(d,aws,DATADIR,XMLDIR,CORRDIR,freqmin,freqmax,cc_len,cc_step)
+    println("Correlating $d")
+    filelist = LH_query(aws,d)
+    LH_download(aws,filelist,DATADIR)
+    infiles = joinpath.(DATADIR,filelist)
+    ZNEfiles = prunefiles(infiles)
+    FFTS = map(x -> prepare_LH(x,XMLDIR,freqmin,freqmax,cc_len,cc_step),ZNEfiles)
+    LH_day_corr(d,FFTS,maxlag,CORRDIR)
+    return nothing 
+end
 
