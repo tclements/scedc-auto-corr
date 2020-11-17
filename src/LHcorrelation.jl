@@ -1,4 +1,4 @@
-export prepare_LH, LH_to_FFT, read_and_remove, all2all!
+export prepare_LH, LH_to_FFT, read_and_remove, all2all
 export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack
 
 function prepare_LH(
@@ -85,33 +85,31 @@ function read_and_remove(file::String,freqmin::Real,freqmax::Real,RESP::SeisData
     return S
 end
 
-function all2all!(
-    C::AbstractArray{CorrData},
+function all2all(
     FFT1::AbstractArray{FFTData},
     FFT2::AbstractArray{FFTData},
     maxlag::Real,
 )
     @assert size(FFT1,1) == 3
     @assert size(FFT2,1) == 3 
-    @assert size(C,1) == 9
-    @inbounds for ii = 1:3
-        @inbounds for jj = 1:3
+    C = Array{CorrData}(undef,9)
+    for ii = 1:3
+        for jj = 1:3
             C[(ii-1) * 3 + jj] = correlate(FFT1[ii],FFT2[jj],maxlag)
         end
     end
-    return nothing
+    return C
 end
 
 function LH_corr(d::Date,FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
     N = size(FFTS,1)
     comps = ["EE","EN","EZ","NE","NN","NZ","ZE","ZN","ZZ"]
-    CS = Array{CorrData}(undef,9)
     filename = joinpath(CORRDIR,"$(date2yyyyjjj(d)).jld2")
     file = jldopen(filename, "a+")
     for ii = 1:N-1
         for jj = ii+1:N
             # cross-correlate 
-            all2all!(CS,FFTS[ii],FFTS[jj],maxlag)
+            CS = all2all(FFTS[ii],FFTS[jj],maxlag)
             stack!.(CS)
             net1,sta1,loc1,chan1,net2,sta2,loc2,chan2 = split(CS[1].name,'.')
             netsta = join([net1,sta1,net2,sta2],".")
@@ -141,7 +139,7 @@ end
 
 function LH_query(aws::AWSConfig,d::TimeType)
     # download index for day
-    path = SCEDC.indexpath(d)
+    path = indexpath(d)
     filedf = CSV.File(IOBuffer(s3_get(aws,"scedc-pds",path))) |> DataFrame
     filedf = filedf[filedf[:,:net] .== "CI",:]
     filedf = filedf[occursin.("LH",filedf[:,:seedchan]),:]

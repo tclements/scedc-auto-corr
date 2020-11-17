@@ -1,4 +1,4 @@
-export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, XML_download
+export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, XML_download, indexpath, scedcpath
 
 function prunefiles(filelist::AbstractArray; minsize = 0.25, maxsize = 2.)
     if length(filelist) == 0
@@ -61,4 +61,26 @@ function XML_download(aws,XMLDIR)
         s3_get_file(aws,"scedc-pds",xmlin[ii],xmlout[ii])
     end
     return nothing
+end
+
+function indexpath(d::Date)
+    days = (d - Date(Year(d))).value + 1
+    n = ndigits(days)
+	jstr = ('0' ^ (3 - n)) * string(days)
+	ystr = string(Year(d).value)
+    outstring = "continuous_waveforms/index/csv/year="
+    outstring *= ystr * "/year_doy="
+    outstring *= ystr * '_' * jstr
+    outstring *= "/$(ystr)_$(jstr)_waveform_index.csv"
+    return outstring
+end
+
+"""
+  scedcpath(filename)
+Convert filename to scedc-pds path.
+"""
+function scedcpath(filename::String)
+    year = filename[14:17]
+    day = filename[18:20]
+    return "continuous_waveforms/" * year * '/' * year * '_' * day * '/' * filename
 end
