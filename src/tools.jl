@@ -52,7 +52,7 @@ end
 
 function XML_download(aws,XMLDIR)
     if !isdir(XMLDIR)
-        mkpath(XMKDIR)
+        mkpath(XMLDIR)
     end
     req = collect(s3_list_objects(aws,"scedc-pds","FDSNstationXML/CI/"))
     xmlin = [r["Key"] for r in req]
