@@ -145,6 +145,7 @@ function LH_query(aws::AWSConfig,d::TimeType)
     # download index for day
     path = SCEDC.indexpath(d)
     filedf = CSV.File(IOBuffer(s3_get(aws,"scedc-pds",path))) |> DataFrame
+    filedf = filedf[filedf[:,:net] .== "CI",:]
     filedf = filedf[occursin.("LH",filedf[:,:seedchan]),:]
     return scedcpath.(filedf[:ms_filename])
 end
