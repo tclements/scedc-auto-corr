@@ -247,7 +247,7 @@ function LH_write_combine(CORRDIR,COMBDIR)
     return nothing 
 end
 
-function LH_all_day(d,aws,DATADIR,XMLDIR,CORRDIR,freqmin,freqmax,cc_len,cc_step)
+function LH_all_day(d,aws,DATADIR,XMLDIR,CORRDIR,freqmin,freqmax,cc_len,cc_step,maxlag)
     println("Correlating $d")
     filelist = LH_query(aws,d)
     LH_download(aws,filelist,DATADIR)
