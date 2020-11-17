@@ -75,6 +75,7 @@ function read_and_remove(file::String,freqmin::Real,freqmax::Real,RESP::SeisData
     detrend!(S)
     ungap!(S)
     taper!(S,t_max=50.)
+    phase_shift!(S)
     filtfilt!(S,rt="Bandpass",fl=freqmin,fh=freqmax,np=2)
     net,sta,loc,chan = split(S.id[1],'.')
     ind = findfirst(RESP.id .== S[1].id)
@@ -142,6 +143,7 @@ function LH_query(aws::AWSConfig,d::TimeType)
     path = indexpath(d)
     filedf = CSV.File(IOBuffer(s3_get(aws,"scedc-pds",path))) |> DataFrame
     filedf = filedf[filedf[:,:net] .== "CI",:]
+    filedf = filedf[filedf[:,:location] .== "--",:]
     filedf = filedf[occursin.("LH",filedf[:,:seedchan]),:]
     return scedcpath.(filedf[:ms_filename])
 end
