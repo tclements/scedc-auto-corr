@@ -129,14 +129,12 @@ end
 
 function LH_day_corr(d::Date,aws,DATADIR,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,cc_step,maxlag)
     println("Correlating $d")
-    CORROUT = joinpath(CORRDIR,date2yyyyjjj(d))
-    mkpath(CORROUT)
     filelist = LH_query(aws,d)
     LH_download(aws,filelist,DATADIR)
     infiles = joinpath.(DATADIR,filelist)
     ZNEfiles = prunefiles(infiles)
     FFTS = map(x -> prepare_LH(x,XMLDIR,freqmin,freqmax,cc_len,cc_step),ZNEfiles)
-    LH_corr(d,FFTS,maxlag,CORROUT)
+    LH_corr(d,FFTS,maxlag,CORRDIR)
     rm.(infiles)
     return nothing
 end
