@@ -17,6 +17,7 @@ SeisNoise = "8cc7c3c0-6b5d-11e9-39fe-c9cd0236e08b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
+JLD2 = "0.3"
 julia = "1"
 
 [extras]
