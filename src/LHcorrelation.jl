@@ -127,7 +127,7 @@ function LH_corr(d::Date,FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
     return nothing
 end
 
-function LH_day_corr(d::Date,aws,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,cc_step,maxlag)
+function LH_day_corr(d::Date,aws,DATADIR,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,cc_step,maxlag)
     println("Correlating $d")
     CORROUT = joinpath(CORRDIR,date2yyyyjjj(d))
     mkpath(CORROUT)
