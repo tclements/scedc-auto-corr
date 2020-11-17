@@ -1,4 +1,4 @@
-export prepare_LH, LH_to_FFT, read_and_remove, all2all
+export prepare_LH, LH_to_FFT, read_and_remove, all2all, LH_check_time
 export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack
 
 function prepare_LH(
@@ -39,9 +39,14 @@ function prepare_LH(
     weights = maximum(hcat([Eweights,Nweights]...),dims=2)[:]
     E.x[1] ./= weights
     N.x[1] ./= weights 
-
+    
+    # check for instance where any of E, N, or Z is very small
     # convert to FFT 
-    return LH_to_FFT(E,N,Z,cc_len,cc_step)
+    if LH_check_time(Z,cc_len,cc_step) & LH_check_time(E,cc_len,cc_step)
+        return LH_to_FFT(E,N,Z,cc_len,cc_step)
+    else
+        return [FFTData() for _ = 1:3]
+    end
 end
 
 function LH_to_FFT(E,N,Z,cc_len,cc_step)
@@ -110,15 +115,17 @@ function LH_corr(d::Date,FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
     for ii = 1:N-1
         for jj = ii+1:N
             # cross-correlate 
-            CS = all2all(FFTS[ii],FFTS[jj],maxlag)
-            stack!.(CS)
-            net1,sta1,loc1,chan1,net2,sta2,loc2,chan2 = split(CS[1].name,'.')
-            netsta = join([net1,sta1,net2,sta2],".")
+            if length(intersect(FFTS[ii][1].t,FFTS[jj][1].t)) > 0
+                CS = all2all(FFTS[ii],FFTS[jj],maxlag)
+                stack!.(CS)
+                net1,sta1,loc1,chan1,net2,sta2,loc2,chan2 = split(CS[1].name,'.')
+                netsta = join([net1,sta1,net2,sta2],".")
 
-            # save to file
-            for kk = 1:9
-                compname = "$netsta/$(CS[kk].comp)/$(CS[kk].id)"
-                file[compname] = CS[kk]
+                # save to file
+                for kk = 1:9
+                    compname = "$netsta/$(CS[kk].comp)/$(CS[kk].id)"
+                    file[compname] = CS[kk]
+                end
             end
         end
     end
@@ -245,3 +252,29 @@ function LH_write_combine(CORRDIR,COMBDIR)
     return nothing 
 end
 
+function LH_check_time(S::SeisData,cc_len,cc_step)
+    starttime = SeisIO.starttime(S.t[1],S.fs[1]) * SeisIO.μs
+    endtime = SeisIO.endtime(S.t[1],S.fs[1]) * SeisIO.μs
+
+    # check if data is within a window 
+    tot = endtime - starttime + 1 ./ S.fs[1]
+    if tot > cc_len * 2 
+        return true
+    elseif tot < cc_len 
+        return false
+    end
+    
+    # tricky case where cc_len < length(S[1].x) < 2 * cc_len
+    starttime = round(starttime,digits=4) 
+    endtime = round(endtime,digits=4)
+    ideal_start = d2u(DateTime(Date(u2d(starttime))))
+    starts = Array(range(ideal_start,stop=endtime,step=cc_step))
+    ends = starts .+ cc_len .- 1. / S.fs[1] 
+    startind = findfirst(x -> x >= starttime, starts)
+    endind = findlast(x -> x <= endtime,ends)
+    if endind < startind 
+        return false
+    else
+        return true
+    end
+end
