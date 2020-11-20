@@ -1,4 +1,4 @@
-export prepare_LH, LH_to_FFT, read_and_remove, all2all, LH_check_time
+export prepare_LH, LH_to_FFT, read_and_remove, all2all, LH_check_time, split_by_month
 export LH_corr, LH_query, LH_download, LH_day_corr, LH_write_combine, LH_stack
 
 function prepare_LH(
@@ -223,37 +223,29 @@ function getkeys(file)
     return out
 end
 
-function LH_write_combine(CORRDIR,COMBDIR)
+function LH_write_combine(files,COMBDIR)
     if !isdir(COMBDIR)
         mkpath(COMBDIR)
     end
 
-    files = glob("*",CORRDIR)
-    yyyy = [parse(Int,basename(f)[1:4]) for f in files]
-    mm = [month(yyyyjjj2date(replace(basename(f)[1:8],"_"=>""))) for f in files]
-    yyyymm = hcat(yyyy,mm)
-    months = unique(yyyymm,dims=1)
-    Nmonths = size(months,1)
-
     # open COMBfile 
-    for ii = 1:Nmonths
-        ind = findall(months[ii] .== yyyymm)
-        combname = joinpath(
+    yyyy = parse(Int,basename(files[1])[1:4]) 
+    mm = month(yyyyjjj2date(replace(basename(files[1])[1:8],"_"=>"")))
+    combname = joinpath(
                             COMBDIR,
-                            string(months[ii,1]) 
-                            * "_" * lpad(string(months[ii,2]),2,"0")
+                            string(yyyy) 
+                            * "_" * lpad(string(mm),2,"0")
                              * ".jld2")
-        combfile = jldopen(combname,"a+")
-        for jj = 1:length(ind)
-            file = jldopen(files[ind[jj]],"r")
-            filekeys = getkeys(file)
-            for kk = 1:length(filekeys)
-                combfile[filekeys[kk]] = file[filekeys[kk]]
-            end
-            close(file)
+    combfile = jldopen(combname,"a+")
+    for ii = 1:size(files,1)
+        file = jldopen(files[ii],"r")
+        filekeys = getkeys(file)
+        for jj = 1:size(filekeys,1)
+            combfile[filekeys[jj]] = file[filekeys[jj]]
         end
-        close(combfile)
+        close(file)
     end
+    close(combfile)
     return nothing 
 end
 
@@ -282,4 +274,16 @@ function LH_check_time(S::SeisData,cc_len,cc_step)
     else
         return true
     end
+end
+
+function split_by_month(files)
+    ds = [replace.(replace.(basename.(f),"_"=>""),".jld2"=>"") for f in files]
+    dates = [yyyyjjj2date(d) for d in ds]
+    ms = month.(dates)
+    months = Any[]
+    for ii = 1:maximum(ms)
+        ind = findall(ms .== ii)
+        push!(months,files[ind])
+    end
+    return months
 end
