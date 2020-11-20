@@ -18,6 +18,11 @@ function prepare_LH(
     N = read_and_remove(fileN,freqmin,freqmax,RESP)
     Z = read_and_remove(fileZ,freqmin,freqmax,RESP)
 
+    # check for problem with single data point gap 
+    E.t[1][2,2] = 0
+    N.t[1][2,2] = 0
+    Z.t[1][2,2] = 0
+
     # synchronize E and N starttimes/endtimes for normalization 
     S = E + N
     sync!(S,s="last",t="first")
