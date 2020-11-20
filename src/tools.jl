@@ -23,7 +23,7 @@ function prunefiles(filelist::AbstractArray; minsize = 0.25, maxsize = 2.)
 end
 
 function yyyyjjj2date(yearday::String)
-    @assert occursin(r"[1-2][0-9][0-9][0-9][0-3][0-6][0-9]",yearday)
+    @assert occursin(r"[1-2][0-9][0-9][0-9][0-3][0-9][0-9]",yearday)
     yint = parse(Int,yearday[1:4])
     dint = parse(Int,yearday[5:end])
     @assert dint <= 366 "Input day must be less than or equal to 366"
