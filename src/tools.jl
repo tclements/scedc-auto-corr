@@ -1,13 +1,23 @@
 export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, XML_download, indexpath, scedcpath
 
-function prunefiles(filelist::AbstractArray; minsize = 0.25, maxsize = 2.)
+function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
     if length(filelist) == 0
 	    return []
     end
 	files = deepcopy(filelist)
     fsizes = [filesize(f) for f in files]
-    ind = findall((fsizes .< median(fsizes) * minsize) .| (fsizes .> median(fsizes) * maxsize))
-	deleteat!(files,ind)
+
+    # check for minimum and maximum sizes relative to median 
+    ind = findall((fsizes .< median(fsizes) * minfraction) .| (fsizes .> median(fsizes) * maxfraction))
+    deleteat!(files,ind)
+    
+    # check for really small files 
+    ind = findall(fsizes .< minsize)
+    deleteat!(files,ind)
+
+    if isempty(files)
+        return []
+    end
 
     # get individual stations
     stations = unique([replace(basename(f)[1:7],"_"=>"") for f in files])

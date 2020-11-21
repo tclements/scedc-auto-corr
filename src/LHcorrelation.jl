@@ -120,7 +120,7 @@ function LH_corr(d::Date,FFTS::AbstractArray,maxlag::Real,CORRDIR::String)
     for ii = 1:N-1
         for jj = ii+1:N
             # cross-correlate 
-            if length(intersect(FFTS[ii][1].t,FFTS[jj][1].t)) > 0
+            if check_intersect(FFTS[ii],FFTS[jj])
                 CS = all2all(FFTS[ii],FFTS[jj],maxlag)
                 stack!.(CS)
                 net1,sta1,loc1,chan1,net2,sta2,loc2,chan2 = split(CS[1].name,'.')
@@ -144,8 +144,11 @@ function LH_day_corr(d::Date,aws,DATADIR,CORRDIR,XMLDIR,freqmin,freqmax,cc_len,c
     LH_download(aws,filelist,DATADIR)
     infiles = joinpath.(DATADIR,filelist)
     ZNEfiles = prunefiles(infiles)
-    FFTS = map(x -> prepare_LH(x,XMLDIR,freqmin,freqmax,cc_len,cc_step),ZNEfiles)
-    LH_corr(d,FFTS,maxlag,CORRDIR)
+    # check for day with bad files
+    if !isempty(ZNEfiles)
+        FFTS = map(x -> prepare_LH(x,XMLDIR,freqmin,freqmax,cc_len,cc_step),ZNEfiles)
+        LH_corr(d,FFTS,maxlag,CORRDIR)
+    end
     rm.(infiles)
     return nothing
 end
@@ -286,4 +289,15 @@ function split_by_month(files)
         push!(months,files[ind])
     end
     return months
+end
+
+function check_intersect(FFT1,FFT2)
+    for ii = 1:3
+        for jj = 1:3
+            if length(intersect(FFT1[ii].t,FFT2[jj].t)) == 0 
+                return false
+            end
+        end
+    end
+    return true 
 end
