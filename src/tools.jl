@@ -1,23 +1,11 @@
-export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, XML_download, indexpath, scedcpath
+export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, XML_download, indexpath, scedcpath, size_check
 
 function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
     if length(filelist) == 0
 	    return []
     end
-	files = deepcopy(filelist)
-    fsizes = [filesize(f) for f in files]
-
-    # check for minimum and maximum sizes relative to median 
-    ind = findall((fsizes .< median(fsizes) * minfraction) .| (fsizes .> median(fsizes) * maxfraction))
-    deleteat!(files,ind)
     
-    # check for really small files 
-    ind = findall(fsizes .< minsize)
-    deleteat!(files,ind)
-
-    if isempty(files)
-        return []
-    end
+    files = size_check(filelist,minfraction=minfraction,maxfraction=maxfraction, minsize=minsize)
 
     # get individual stations
     stations = unique([replace(basename(f)[1:7],"_"=>"") for f in files])
@@ -32,6 +20,17 @@ function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2
 	return infiles
 end
 
+function size_check(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
+	files = deepcopy(filelist)
+    fsizes = [filesize(f) for f in files]
+
+    # check for minimum and maximum sizes relative to median 
+    ind1 = findall((fsizes .< median(fsizes) * minfraction) .| (fsizes .> median(fsizes) * maxfraction))
+    ind2 = findall(fsizes .< minsize)
+    deleteat!(files,unique([ind1;ind2]))
+    return files
+end
+
 function yyyyjjj2date(yearday::String)
     @assert occursin(r"[1-2][0-9][0-9][0-9][0-3][0-9][0-9]",yearday)
     yint = parse(Int,yearday[1:4])
@@ -44,10 +43,11 @@ function date2yyyyjjj(d::TimeType)
     return "$(year(d))_$(lpad(dayofyear(d),3,"0"))"
 end
 
-function upload_par(aws::Dict,output_bucket::String,s3file::String,ec2file::String)
+function upload_par(aws::AWSConfig,output_bucket::String,s3file::String,ec2file::String)
     println("Uploading file $ec2file")
     s3_put(aws,output_bucket,s3file,read(ec2file))
 end
+upload_par(a...) = upload_par(global_aws_config(region="us-west-2"),a...)
 
 function read_resp(file::String,XMLDIR::String)
     s = yyyyjjj2date(file[end-9:end-3])
@@ -72,6 +72,7 @@ function XML_download(aws,XMLDIR)
     end
     return nothing
 end
+XML_download(XMLDIR) = XML_download(global_aws_config(region="us-west-2"),XMLDIR)
 
 function indexpath(d::Date)
     days = (d - Date(Year(d))).value + 1
