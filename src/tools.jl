@@ -1,4 +1,5 @@
-export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, XML_download, indexpath, scedcpath, size_check
+export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj
+export XML_download, indexpath, scedcpath, size_check, update_resp_t!, sync_resp
 
 function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
     if length(filelist) == 0
@@ -94,4 +95,34 @@ function scedcpath(filename::String)
     year = filename[14:17]
     day = filename[18:20]
     return "continuous_waveforms/" * year * '/' * year * '_' * day * '/' * filename
+end
+
+"""
+  update_resp_t!(S)
+
+Add time matrices for instrument response stored in SeisData
+"""
+function update_resp_t!(S::SeisData)
+    for ii = 1:S.n
+        S.t[ii] = [1 S.misc[ii]["startDate"];0 S.misc[ii]["endDate"]]
+    end
+    return nothing 
+end
+
+"""
+  sync_resp(S,s,t)
+
+Prune SeisData such that response are within statrttime `s` 
+"""
+function sync_resp(S::SeisData,s::Int64,t::Int64)
+    todelete = [] 
+    for ii = 1:S.n 
+        if S.t[ii][1,2] > t
+            append!(todelete,ii)
+        elseif S.t[ii][2,2] < s 
+            append!(todelete,ii)
+        end
+    end
+    ind = setdiff(1:S.n,todelete)
+    return S[ind]
 end
