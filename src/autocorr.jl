@@ -53,8 +53,29 @@ function stream_autocorr(
 	RESP::SeisData;
 	responsefreq::Real=0.1,
 )
-	# stream files from s3 
-	S = ec2stream("scedc-pds",mseedfiles)
+	# print net station channel and date 
+	p = replace(basename(mseedfiles[1]),".ms"=>"") 
+	pstr = join(split(p,"_",keepempty=false)," ")
+	println("Auto-correlation $pstr $(now())")
+
+	# stream from S3 
+	S = SeisData()
+	for ii = 1:3 
+		S += SCEDC.s3_get_seed(
+			"scedc-pds",
+			mseedfiles[ii],
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			0,
+		)
+	end
 	starttimes = [SeisIO.starttime(S.t[ii],S.fs[ii]) for ii = 1:S.n]
 	endtimes = [SeisIO.endtime(S.t[ii],S.fs[ii]) for ii = 1:S.n]
 	s = minimum(starttimes)
