@@ -120,9 +120,22 @@ function process_sc!(
 )
 	merge!(S)
 	sort!(S)
+	taper!(S,t_max=100.)
+    ungap!(S,m=false)
 	demean!(S)
-    ungap!(S,tap=true)
-	detrend!(S)         # remove mean & trend from channel                  # taper channel ends
+	detrend!(S) 
+
+	# find and replace nans with zeros 
+	nans = Dict()
+	for ii = 1:3
+		nans[ii] = findall(isnan.(S.x[ii]))
+		S.x[ii][nans[ii]] .= 0 
+	end
+
+	# highpass filter 
+	highpass!(S,responsefreq,zerophase=true,corners=2)
+      
+	# phase shift if necessary
 	if S[1].t[1,2] == S[2].t[1,2] == S[3].t[1,2]
 		ϕshift = false
 	else
@@ -131,7 +144,6 @@ function process_sc!(
     phase_shift!(S, ϕshift=ϕshift)
 
 	# remove instrument response
-	highpass!(S,responsefreq,zerophase=true,corners=2)
 	for ii = 1:3
 		S.loc[ii] = RESP.loc
 		S.gain[ii] = RESP.gain
@@ -139,7 +151,12 @@ function process_sc!(
 	end
 	remove_resp!(S)
 	resample!(S,fs=fs) 
-	taper!(S)
+	
+	# replace gaps with zeros
+	for ii = 1:3
+		S.x[ii][nans[ii]] .= 0 
+	end 
+
 	return nothing
 end
 
