@@ -120,9 +120,9 @@ function process_sc!(
 )
 	merge!(S)
 	sort!(S)
-    ungap!(S)
-	detrend!(S)         # remove mean & trend from channel
-	taper!(S)                      # taper channel ends
+	demean!(S)
+    ungap!(S,tap=true)
+	detrend!(S)         # remove mean & trend from channel                  # taper channel ends
 	if S[1].t[1,2] == S[2].t[1,2] == S[3].t[1,2]
 		ϕshift = false
 	else
