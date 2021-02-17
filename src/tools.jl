@@ -1,5 +1,5 @@
-export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj
-export XML_download, indexpath, scedcpath, size_check, update_resp_t!, sync_resp
+export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, nancorr
+export XML_download, indexpath, scedcpath, size_check, update_resp_t!, sync_resp, get_gaps
 
 function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
     if length(filelist) == 0
@@ -125,4 +125,20 @@ function sync_resp(S::SeisData,s::Int64,t::Int64)
     end
     ind = setdiff(1:S.n,todelete)
     return S[ind]
+end
+
+function get_gaps(S::SeisData)
+    ngaps = zeros(Int,S.n)
+    for ii = 1:S.n
+        ngaps[ii] = size(S.t[ii],1) - 2
+    end
+    return ngaps
+end
+
+function nancorr(S::SeisData, d::DateTime, fs::Real, maxlag::Real)
+    C = CorrData()
+    T = eltype(S.x[1])
+    C.t = [d2u(d)]
+    C.corr = zeros(T,convert(Int,2 * fs * maxlag) + 1,1)
+    C.corr .= NaN
 end

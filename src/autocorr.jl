@@ -52,6 +52,7 @@ function stream_autocorr(
 	maxlag::AbstractFloat,
 	RESP::SeisData;
 	responsefreq::Real=0.1,
+	maxgaps::Int=100,
 )
 	# print net station channel and date 
 	p = replace(basename(mseedfiles[1]),".ms"=>"") 
@@ -76,6 +77,16 @@ function stream_autocorr(
 			0,
 		)
 	end
+
+	# short circuit if lots of gaps in data
+	ngaps = get_gaps(S)
+	if maximum(ngaps) > maxgaps
+		julday = replace(basename(dirname(mseedfiles[1])),"_"=>"")
+		d = yyyyjjj2date(julday)
+		C = nancorr(S,d,fs,maxlag)
+		return C,C,C
+	end
+
 	starttimes = [SeisIO.starttime(S.t[ii],S.fs[ii]) for ii = 1:S.n]
 	endtimes = [SeisIO.endtime(S.t[ii],S.fs[ii]) for ii = 1:S.n]
 	s = minimum(starttimes)
