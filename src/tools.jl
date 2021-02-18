@@ -141,4 +141,5 @@ function nancorr(S::SeisData, d::DateTime, fs::Real, maxlag::Real)
     C.t = [d2u(d)]
     C.corr = zeros(T,convert(Int,2 * fs * maxlag) + 1,1)
     C.corr .= NaN
+    return C
 end
