@@ -108,6 +108,13 @@ function stream_autocorr(
 		responsefreq=responsefreq,
 	)
 
+	if all(isnan.(S.x[1]))
+		julday = replace(basename(dirname(mseedfiles[1])),"_"=>"")
+		d = yyyyjjj2date(julday)
+		C = nancorr(S,d,fs,maxlag)
+		return C,C,C
+	end
+
 	# convert to FFT 
 	F1 = seischannel2fft(S[1],cc_len,cc_step,freqmin,freqmax)
 	F2 = seischannel2fft(S[2],cc_len,cc_step,freqmin,freqmax)
@@ -129,12 +136,21 @@ function process_sc!(
 	RESP::SeisChannel;
 	responsefreq::Real=0.1,
 )
-	sort!(S)
-	taper!(S,t_max=100.)
-	merge!(S)
-    ungap!(S,m=false)
-	demean!(S)
-	detrend!(S) 
+
+	# if can't merge, return NaNs 
+	try 
+		merge!(S)
+		sort!(S)
+		taper!(S,t_max=100.)
+		ungap!(S,m=false)
+		demean!(S)
+		detrend!(S) 
+	catch e
+		for ii = 1:S.n
+			S.x[ii] .= NaN
+		end
+		return S
+	end
 
 	# find and replace nans with zeros 
 	nans = Dict()
@@ -161,12 +177,13 @@ function process_sc!(
 		S.resp[ii] = RESP.resp
 	end
 	remove_resp!(S)
-	resample!(S,fs=fs) 
 	
 	# replace gaps with zeros
 	for ii = 1:3
 		S.x[ii][nans[ii]] .= 0 
 	end 
+
+	resample!(S,fs=fs) 
 
 	return nothing
 end
