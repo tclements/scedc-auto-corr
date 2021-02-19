@@ -129,9 +129,9 @@ function process_sc!(
 	RESP::SeisChannel;
 	responsefreq::Real=0.1,
 )
-	merge!(S)
 	sort!(S)
 	taper!(S,t_max=100.)
+	merge!(S)
     ungap!(S,m=false)
 	demean!(S)
 	detrend!(S) 
