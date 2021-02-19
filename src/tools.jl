@@ -1,4 +1,4 @@
-export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, nancorr
+export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, nancorr, s3_get_autocorr
 export XML_download, indexpath, scedcpath, size_check, update_resp_t!, sync_resp, get_gaps
 
 function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
@@ -142,4 +142,10 @@ function nancorr(S::SeisData, d::DateTime, fs::Real, maxlag::Real)
     C.corr = zeros(T,convert(Int,2 * fs * maxlag) + 1,1)
     C.corr .= NaN
     return C
+end
+
+function s3_get_autocorr(aws::AWSConfig,bucket::String,path::String)
+    s = IOBuffer(s3_get(aws,bucket,path))
+    seekstart(s)
+    return deserialize(s)
 end
