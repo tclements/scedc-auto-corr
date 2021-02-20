@@ -61,21 +61,13 @@ function stream_autocorr(
 
 	# stream from S3 
 	S = SeisData()
-	for ii = 1:3 
-		S += SCEDC.s3_get_seed(
-			"scedc-pds",
-			mseedfiles[ii],
-			false,
-			false,
-			false,
-			false,
-			false,
-			false,
-			false,
-			false,
-			false,
-			0,
-		)
+	try 
+		S += scedc_stream(mseedfiles)
+	catch e
+		julday = replace(basename(dirname(mseedfiles[1])),"_"=>"")
+		d = yyyyjjj2date(julday)
+		C = nancorr(d,fs,maxlag)
+		return C,C,C
 	end
 
 	# short circuit if lots of gaps in data
@@ -83,7 +75,7 @@ function stream_autocorr(
 	if maximum(ngaps) > maxgaps
 		julday = replace(basename(dirname(mseedfiles[1])),"_"=>"")
 		d = yyyyjjj2date(julday)
-		C = nancorr(S,d,fs,maxlag)
+		C = nancorr(d,fs,maxlag)
 		return C,C,C
 	end
 
@@ -111,7 +103,7 @@ function stream_autocorr(
 	if all(isnan.(S.x[1]))
 		julday = replace(basename(dirname(mseedfiles[1])),"_"=>"")
 		d = yyyyjjj2date(julday)
-		C = nancorr(S,d,fs,maxlag)
+		C = nancorr(d,fs,maxlag)
 		return C,C,C
 	end
 

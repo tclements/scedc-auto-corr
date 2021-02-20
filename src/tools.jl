@@ -1,5 +1,5 @@
 export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, nancorr, s3_get_autocorr
-export XML_download, indexpath, scedcpath, size_check, update_resp_t!, sync_resp, get_gaps
+export XML_download, indexpath, scedcpath, size_check, update_resp_t!, sync_resp, get_gaps, scedc_stream
 
 function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
     if length(filelist) == 0
@@ -135,11 +135,10 @@ function get_gaps(S::SeisData)
     return ngaps
 end
 
-function nancorr(S::SeisData, d::DateTime, fs::Real, maxlag::Real)
+function nancorr(d::DateTime, fs::Real, maxlag::Real)
     C = CorrData()
-    T = eltype(S.x[1])
     C.t = [d2u(d)]
-    C.corr = zeros(T,convert(Int,2 * fs * maxlag) + 1,1)
+    C.corr = zeros(Float32,convert(Int,2 * fs * maxlag) + 1,1)
     C.corr .= NaN
     return C
 end
@@ -148,4 +147,25 @@ function s3_get_autocorr(aws::AWSConfig,bucket::String,path::String)
     s = IOBuffer(s3_get(aws,bucket,path))
     seekstart(s)
     return deserialize(s)
+end
+
+function scedc_stream(mseedfiles)
+    S = SeisData()
+	for ii = 1:3 
+		S += SCEDC.s3_get_seed(
+			"scedc-pds",
+			mseedfiles[ii],
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			0,
+		)
+	end
+    return S
 end
