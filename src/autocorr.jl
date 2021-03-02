@@ -15,7 +15,7 @@ function sc_all(
 
 	# read instrument response only once 
 	RESP = read_resp(mseedfiles[1],XMLDIR)
-	ind = findfirst(contains.(RESP.id,".HH"))
+	ind = findfirst(contains.(RESP.id,".BH"))
 	RESP = RESP[ind]
 
 	S = read_data("mseed",mseedfiles)
@@ -31,15 +31,12 @@ function sc_all(
 	F3 = seischannel2fft(S[3],cc_len,cc_step,freqmin,freqmax)
 
 	C1 = correlate(F1,F2,maxlag)
-	stack!(C1)
-	save_corr(cpu(C1),CORROUT)
+	robuststack!(C1)
 	C2 = correlate(F1,F3,maxlag)
-	stack!(C2)
-	save_corr(cpu(C2),CORROUT)
+	robuststack!(C2)
 	C3 = correlate(F2,F3,maxlag)
-	stack!(C3)
-	save_corr(cpu(C3),CORROUT)
-    return nothing
+	robuststack!(C3)
+    return C1, C2, C3
 end
 
 function stream_autocorr(
@@ -114,11 +111,11 @@ function stream_autocorr(
 
 	# correlate
 	C1 = correlate(F1,F2,maxlag)
-	stack!(C1)
+	robuststack!(C1)
 	C2 = correlate(F1,F3,maxlag)
-	stack!(C2)
+	robuststack!(C2)
 	C3 = correlate(F2,F3,maxlag)
-	stack!(C3)
+	robuststack!(C3)
     return C1,C2,C3
 end
 
