@@ -8,7 +8,6 @@ function sc_all(
 	freqmin::AbstractFloat,
 	freqmax::AbstractFloat,
 	maxlag::AbstractFloat,
-	CORROUT::String,
 	XMLDIR::String;
 	responsefreq::Real=0.1,
 )
@@ -18,6 +17,9 @@ function sc_all(
 	ind = findfirst(contains.(RESP.id,".BH"))
 	RESP = RESP[ind]
 
+	p = replace(basename(mseedfiles[1]),".ms"=>"") 
+	pstr = join(split(p,"_",keepempty=false)," ")
+	println("Auto-correlation $pstr $(now())")
 	S = read_data("mseed",mseedfiles)
 
 	process_sc!(
@@ -189,9 +191,8 @@ function seischannel2fft(
 	R = RawData(C,cc_len,cc_step) 
 	detrend!(R)
 	taper!(R)
-	bandpass!(R,freqmin,freqmax,zerophase=true)
-	clip!(R,3)
-	F = rfft(R)
-	whiten!(F,freqmin,freqmax)
-	return F
+	highpass!(R,freqmin,zerophase=true)
+	whiten!(R,freqmin,freqmax)
+	onebit!(R)
+	return rfft(R)
 end
