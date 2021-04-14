@@ -57,9 +57,8 @@ function stream_autocorr(
 	filetype::String="mseed",
 )
 	# print net station channel and date 
-	p = replace(basename(mseedfiles[1]),".ms"=>"") 
-	pstr = join(split(p,"_",keepempty=false)," ")
-	println("Auto-correlation $pstr $(now())")
+	p = replace(mseedfiles[1],".ms"=>"") 
+	println("Auto-correlation $p $(now())")
 
 	# stream from S3 
 	S = SeisData()
@@ -92,7 +91,7 @@ function stream_autocorr(
 
 	# sync instrument response time 
 	R = sync_resp(RESP,s,t)
-	if length(RESP) == 0
+	if length(R) == 0
 		R = RESP[1]
 	else
 		R = R[1]
@@ -106,7 +105,7 @@ function stream_autocorr(
 		responsefreq=responsefreq,
 	)
 
-	if all(isnan.(S.x[1]))
+	if all(isnan.(S.x[1])) || length(S) != 3 
 		julday = replace(basename(dirname(mseedfiles[1])),"_"=>"")
 		d = yyyyjjj2date(julday)
 		C = nancorr(d,fs,maxlag)
@@ -152,7 +151,7 @@ function process_sc!(
 
 	# find and replace nans with zeros 
 	nans = Dict()
-	for ii = 1:3
+	for ii = 1:S.n
 		nans[ii] = findall(isnan.(S.x[ii]))
 		S.x[ii][nans[ii]] .= 0 
 	end
@@ -161,7 +160,8 @@ function process_sc!(
 	highpass!(S,responsefreq,zerophase=true,corners=2)
       
 	# phase shift if necessary
-	if S[1].t[1,2] == S[2].t[1,2] == S[3].t[1,2]
+	allt = vcat(S.t...)[1:2:end,2]
+	if all(t->t==allt[1],allt)
 		ϕshift = false
 	else
 		ϕshift = true
@@ -169,7 +169,7 @@ function process_sc!(
     phase_shift!(S, ϕshift=ϕshift)
 
 	# remove instrument response
-	for ii = 1:3
+	for ii = 1:S.n
 		S.loc[ii] = RESP.loc
 		S.gain[ii] = RESP.gain
 		S.resp[ii] = RESP.resp
@@ -177,7 +177,7 @@ function process_sc!(
 	remove_resp!(S)
 	
 	# replace gaps with zeros
-	for ii = 1:3
+	for ii = 1:S.n
 		S.x[ii][nans[ii]] .= 0 
 	end 
 
