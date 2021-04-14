@@ -52,6 +52,9 @@ function stream_autocorr(
 	RESP::SeisData;
 	responsefreq::Real=0.1,
 	maxgaps::Int=100,
+	aws_config::AWSConfig=global_aws_config(),
+	bucket::String="scedc-pds",
+	filetype::String="mseed",
 )
 	# print net station channel and date 
 	p = replace(basename(mseedfiles[1]),".ms"=>"") 
@@ -61,7 +64,11 @@ function stream_autocorr(
 	# stream from S3 
 	S = SeisData()
 	try 
-		S += scedc_stream(mseedfiles)
+		if filetype == "mseed"
+			S += mseed_stream(aws_config, bucket, mseedfiles)
+		elseif filetype == "seisio"
+			S += seisio_stream(aws_config, bucket, mseedfiles)
+		end
 	catch e
 		julday = replace(basename(dirname(mseedfiles[1])),"_"=>"")
 		d = yyyyjjj2date(julday)

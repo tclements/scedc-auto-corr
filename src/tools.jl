@@ -1,5 +1,6 @@
-export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, nancorr, s3_get_autocorr
-export XML_download, indexpath, scedcpath, size_check, update_resp_t!, sync_resp, get_gaps, scedc_stream
+export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, nancorr
+export s3_get_autocorr, XML_download, indexpath, scedcpath, size_check, update_resp_t!
+export sync_resp, get_gaps, scedc_stream, mseed_stream, seisio_stream
 
 function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
     if length(filelist) == 0
@@ -149,11 +150,16 @@ function s3_get_autocorr(aws::AWSConfig,bucket::String,path::String)
     return deserialize(s)
 end
 
-function scedc_stream(mseedfiles)
+function mseed_stream(
+    aws::AWSConfig,
+    bucket::String,
+    mseedfiles::AbstractArray,
+)
     S = SeisData()
-	for ii = 1:3 
+	for ii = 1:length(mseedfiles) 
 		S += SCEDC.s3_get_seed(
-			"scedc-pds",
+            aws,
+			bucket,
 			mseedfiles[ii],
 			false,
 			false,
@@ -168,4 +174,54 @@ function scedc_stream(mseedfiles)
 		)
 	end
     return S
+end
+scedc_stream(mseedfiles::AbstractArray) = mseed_stream(global_aws_config(), "scedc-pds",mseedfiles)
+
+function seisio_stream(
+    aws::AWSConfig,
+    bucket::String, 
+    files;
+    v=0,
+)
+
+    A = [] 
+    sbuf  = Array{UInt8, 1}(undef, 65535)
+    chans = Int64[]
+    ver   = SeisIO.vSeisIO
+    L     = zero(Int64)
+    if isa(files, String)
+        files = [files]
+    end
+
+    for path in files 
+        io  = IOBuffer(s3_get(aws, bucket, path))
+
+        # All SeisIO files begin with "SEISIO"
+        if SeisIO.fastread(io, 6) != UInt8[0x53, 0x45, 0x49, 0x53, 0x49, 0x4f]
+            @warn string("Skipped ", path, ": not a SeisIO file!")
+            close(io)
+        end
+
+        ver = SeisIO.fastread(io, Float32)
+        L   = SeisIO.fastread(io, Int64)
+        C   = read!(io, Array{UInt32,1}(undef, L))
+        B   = read!(io, Array{UInt64,1}(undef, L))
+
+        # DND -- faster to avoid seek
+        (v > 0) && println("Reading ", L, " objects from ", f)
+        (v > 1) && println("C = ", C)
+        for n = 1:L
+            (v > 1) && println("Reading object with code ", repr(getindex(C, n)), " (", n, "/", L, ")")
+            R = SeisIO.read_rec(io, ver, getindex(C, n), getindex(B, n == L ? n : n+1))
+            push!(A, R)
+            (v > 1) && println("Read ", typeof(getindex(A, n)), " object (", n, "/", L, ")")
+        end
+
+        close(io)
+    end
+    if size(A,1) == 1
+        return A[1]
+    else
+        return SeisData(A...)
+    end
 end
