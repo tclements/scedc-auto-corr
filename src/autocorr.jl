@@ -134,6 +134,9 @@ function process_sc!(
 	responsefreq::Real=0.1,
 )
 
+	# check sampling rate for corrupted files
+	S.fs = round.(S.fs)
+	
 	# if can't merge, return NaNs 
 	try 
 		merge!(S)
