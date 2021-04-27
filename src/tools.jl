@@ -1,6 +1,7 @@
 export prunefiles, upload_par, read_resp, yyyyjjj2date, date2yyyyjjj, nancorr
 export s3_get_autocorr, XML_download, indexpath, scedcpath, size_check, update_resp_t!
 export sync_resp, get_gaps, scedc_stream, mseed_stream, seisio_stream
+export fast_mad, fast_mad2d
 
 function prunefiles(filelist::AbstractArray; minfraction = 0.25, maxfraction = 2., minsize=20000)
     if length(filelist) == 0
@@ -224,4 +225,65 @@ function seisio_stream(
     else
         return SeisData(A...)
     end
+end
+
+"""
+    fast_mad(A)
+Approximate Median Absolute Deviation of array `A`.
+MAD = median(|Xi- median(A)|)
+"""
+function fast_mad(A::AbstractArray,B::Int=1000)
+    return median_approx(abs.(A .- median_approx(A,B)),B)
+end
+
+function fast_mad2d(A::AbstractArray,B::Int=1000)
+    T = eltype(A)
+    N = size(A,2)
+    mads = zeros(T,1,N)
+    for ii in 1:N
+        mads[ii] = fast_mad(A[:,ii],B)
+    end
+    return mads
+end
+
+function median_bins(A::AbstractArray, B)
+    T = eltype(A)
+    N = length(A)
+    μ = mean(A)
+    σ = std(A)
+    minval = μ - σ
+    maxval = μ + σ
+
+    leftbin = 1
+    bins = zeros(T,B)
+    binwidth = 2 * σ / B
+
+    for ii in 1:N
+        if A[ii] <= minval
+            leftbin += 1 
+        elseif A[ii] < maxval
+            cur = clamp(ceil(Int,(A[ii] - minval) / binwidth),1,B)
+            bins[cur] += 1 
+        end
+    end
+    return μ, σ, leftbin, bins 
+end
+
+function median_approx(A::AbstractArray,B) 
+    μ, σ, leftbin, bins = median_bins(A, B)
+    NA = length(A)
+    mid = (NA + 1) / 2 
+    count = leftbin
+    lastii = length(bins)
+    for (ii, bincount) in enumerate(bins)
+        count += bincount
+        if count >= mid
+            lastii = ii
+            break
+        end
+    end
+
+    binwidth = 2 * σ / B
+    med = μ - σ + binwidth * (lastii + 0.5)
+    return med
 end
